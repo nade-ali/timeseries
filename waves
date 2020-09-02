@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Jul 29 14:10:34 2020
-
-@author: Nade
-"""
 import pandas as pd
 import time
 from pandas import DataFrame
@@ -33,7 +27,7 @@ mpl.rcParams['axes.grid'] = False
 # # ------------------------ DATA IMPORT ------------------------
 # =============================================================================
 df = pd.read_csv(
-  r"C:\Users\Nade\Documents\Python Scripts\Time Series\waves.csv",
+  "waves.csv",
   parse_dates=['Date/Time']
 )
 
