@@ -1,23 +1,28 @@
 import pandas as pd
-import time
 from pandas import DataFrame
-import seaborn as sns
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-from sklearn.preprocessing import RobustScaler
-import numpy as np
-import tensorflow as tf
-from tensorflow import keras
-from matplotlib import rc
-from matplotlib import pyplot
 from pandas.plotting import autocorrelation_plot
 from pylab import rcParams
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.stattools import adfuller
 from statsmodels.tsa.stattools import acf, pacf
 from statsmodels.graphics.tsaplots import plot_pacf,plot_acf
-from sklearn.metrics import mean_squared_error
+
 from math import sqrt
+import time
+
+import seaborn as sns
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+from matplotlib import rc
+from matplotlib import pyplot
+
+from sklearn.preprocessing import RobustScaler
+from sklearn.metrics import mean_squared_error
+import numpy as np
+import tensorflow as tf
+from tensorflow import keras
+
+
 
 sns.set(style='whitegrid', palette='muted', font_scale=1.5)
 rcParams['figure.figsize'] = 22, 10
@@ -38,14 +43,13 @@ train_size = int(len(df) * (900/911))
 test_size = len(df) - train_size
 train, test = df.iloc[0:train_size], df.iloc[train_size:len(df)]
 
-# =============================================================================
-# plt.figure(figsize=(16,9), dpi=200)
-# plt.plot(df['Hs'], 'b')
-# plt.grid(b=None)
-# plt.title('Wave Height from 1-2017 to 6-2019')
-# plt.show()
-# =============================================================================
 
+# We need to normalize the x variables
+# Robustscaler essentially normalizes the data
+# The way to use it is to first create a "transformer" variable
+# The variable is "fitted", i.e. the median and quartiles are calculated
+# Replace the original train & test data with the "transformed" data
+# The "transformed" data has been centred and scaled.
 f_columns = ['Hs']
 f_transformer = RobustScaler()
 f_transformer = f_transformer.fit(train[f_columns].to_numpy())
@@ -65,6 +69,11 @@ test.loc[:,'Hs'] = cnt_transformer.transform(test[['Hs']])
 train = train[['Hs']]
 test = test[['Hs']]
 
+# Create a function to generate a time series dataset
+# the function works like this: first a "history size" is specified
+# The "history size" refers to how long a single "time string" should be
+# The number of strings created is len(training set) - history size
+# For the y-var, the first "history size" number of values are removed
 def create_dataset(X, y, time_steps=1):
     Xs, ys = [], []
     for i in range(len(X) - time_steps):
@@ -77,6 +86,34 @@ time_steps = 10
 X_train, y_train = create_dataset(train, train.Hs, time_steps)
 X_test, y_test = create_dataset(test, test.Hs, time_steps)
 
+# =============================================================================
+# # ------------------------ MODEL CREATION ------------------------
+# =============================================================================
+
+# Sequential refers to a model in which property layers are added
+# The first layer that we add is LSTM within the bidirectional layer
+
+# What are units?
+"""
+The proper intuitive explanation of the 'units' parameter for 
+Keras recurrent neural networks is that with units = 1 you get a RNN 
+as described in textbooks, and with units = n you get a layer which 
+consists of n independent copies of such RNN 
+- they'll have identical structure, but as they'll 
+be initialized with different weights
+"""
+
+# What is the input_shape?
+"""
+A time series input is (typically) a 3D input which has the 
+following dimensions:
+
+Batch dimension - number of samples/rows in a batch
+Time dimension - represents the temporal aspect of your data 
+(e.g. number of days). Here it is "time_steps".
+Input dimension - number of features in a single input 
+and a single timestep or basically, the number of variables.
+"""
 t = time.time()
 model = keras.Sequential()
 model.add(
@@ -88,13 +125,20 @@ model.add(
   )
 )
 
+# The Dropout layer randomly sets input units to 0 with a frequency 
+# of rate at each step during training time, which helps 
+# prevent overfitting.
 model.add(keras.layers.Dropout(rate=0.2))
 
 # Dense is the regular deeply connected neural network layer
 model.add(keras.layers.Dense(units=1))
 model.compile(loss='mean_squared_error', optimizer='adam')
 
-
+# Epochs refer to how many times the entire training set 
+# is to be run through
+# Batch size refers to how the training set is to be broken down
+# If there are a total of 320 rows in the training data, then 
+# The fitting runs 10 times per epoch. 
 history = model.fit(
     X_train, y_train,
     epochs=30,
@@ -103,12 +147,15 @@ history = model.fit(
     shuffle=False
 )
 
+# val_loss is the value of cost function for the 
+# cross-validation data and loss is the value of 
+# cost function for the training data.
 plt.plot(history.history['loss'], label='train')
 plt.plot(history.history['val_loss'], label='test')
 plt.legend()
 plt.show()
 
-
+# Use the model to predict y for the test data
 y_pred = model.predict(X_test)
 
 # Inverse transform takes the data back to its original form
@@ -127,7 +174,7 @@ plt.xlabel('Time Step')
 plt.legend()
 plt.show();
 
-
+# Determine parameters for the ARIMA model
 autocorrelation_plot(train)
 pyplot.show()
 
@@ -151,7 +198,6 @@ print(residuals.describe())
 
 
 # Build Model
-
 history=[x for x in train.values]    
 predictions = list()
 for t in range(len(test)):
