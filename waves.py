@@ -36,6 +36,9 @@ df = pd.read_csv(
   parse_dates=['Date/Time']
 )
 
+# Missing values in the data are represented with -99.9
+# Once the missing values are removed, we need to interpolate to fill gaps
+# Finally, split into training and test sets
 df = df.replace(-99.9,np.nan)
 df = df.interpolate(method = 'linear', limit_direction='both')
 
