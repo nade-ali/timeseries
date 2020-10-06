@@ -22,8 +22,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 
-
-
+# Set plot parameters
 sns.set(style='whitegrid', palette='muted', font_scale=1.5)
 rcParams['figure.figsize'] = 22, 10
 mpl.rcParams['axes.grid'] = False
@@ -169,7 +168,7 @@ y_pred_inv = f_transformer.inverse_transform(y_pred)
 print("Text Preprocessing complete.")
 print(f"Time Taken: {round(time.time()-t)} seconds")
 
-# Same thing as above but just don't show training data
+# Compare predicted and actual y values
 plt.plot(y_test_inv.flatten(), marker='.', label="true")
 plt.plot(y_pred_inv.flatten(), 'r', label="prediction")
 plt.ylabel('Bike Count')
@@ -177,7 +176,11 @@ plt.xlabel('Time Step')
 plt.legend()
 plt.show();
 
-# Determine parameters for the ARIMA model
+# =============================================================================
+# # ------------------------ ARIMA ------------------------
+# =============================================================================
+
+# Determine ARIMA parameters
 autocorrelation_plot(train)
 pyplot.show()
 
@@ -187,11 +190,25 @@ print(result[1])
 plot_pacf(train.diff().dropna(), lags = 10)
 plot_acf(train.diff().dropna(), lags = 10)
 
+# We have selected an ARIMA model with parameters (1,1,1)
+'''
+The Dicky-Fuller test is significant without differencing 
+(due to the RobustScaler method applied earlier) but we still go for d = 1 
+in order to achieve small autocorrelations. Values of p = 1 and q = 1 were 
+then derived from the autocorrelation plots. We therefore use an ARIMA model 
+with parameters (1, 1, 1). 
+'''
 t = time.time()
 model1 = ARIMA(train, order=(1,1,1))
 model1_fit = model1.fit()
 print(model1_fit.summary())
-# plot residual errors
+
+# Plot residual errors
+'''
+The residual map gives us a mean centred around 0 
+and a bell-shape indicating constant variance. Hence, the parameters 
+selected seem to be appropriate for this exercise.
+'''
 residuals = DataFrame(model1_fit.resid)
 residuals.plot()
 pyplot.show()
@@ -200,7 +217,7 @@ pyplot.show()
 print(residuals.describe())
 
 
-# Build Model
+# Build ARIMA Model
 history=[x for x in train.values]    
 predictions = list()
 for t in range(len(test)):
@@ -217,6 +234,7 @@ y_arima_inv = f_transformer.inverse_transform(np.reshape(predictions,(-1,1)))
 print("Text Preprocessing complete.")
 print(f"Time Taken: {round(time.time()-t)} seconds")
 
+# Compare actual, LSTM predicted and ARIMA predicted values
 plt.figure(figsize=(22,10), dpi=100)
 plt.plot(y_test_inv.flatten(), label='actual')
 plt.plot(y_arima_inv[10:528], label='ARIMA')
@@ -225,6 +243,16 @@ plt.title('Forecast vs Actuals')
 plt.legend(loc='upper left', fontsize=8)
 plt.show()
 
+# Compare Root mean square errors
+'''
+The graphs below show what the outputs of the ARIMA and LSTM models look like compared to the test data. 
+The test data contains 528 points, meaning that we’re predicting wave heights for 528/2/24 = 11 days. 
+Both the models look fairly accurate, with LSTM deviating more as time progresses. 
+The Root Mean Squared Error of the ARIMA and the LSTM models are 0.087 and 0.088 respectively. 
+
+The performance of LSTM could be improved with a larger dataset as the current one only contained about 40,000 points. 
+Taking into consideration time constraints, ARIMA is faster but in this example, LSTM ran much faster due to the small data size. 
+'''
 rmse = sqrt(mean_squared_error(y_test_inv.flatten(),y_arima_inv[10:528]))
 print('Test RMSE: %.3f' % rmse)
 
